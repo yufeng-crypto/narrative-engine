@@ -59,6 +59,17 @@ def call_llm(system_prompt: str, user_prompt: str, model: str = DEFAULT_MODEL) -
         )
         resp.raise_for_status()
         data = resp.json()
+    # MiniMax 用 base_resp.status_code 表示业务错误
+    base_resp = data.get("base_resp", {})
+    if base_resp.get("status_code", 0) != 0:
+        raise RuntimeError(
+            f"MiniMax API 错误 {base_resp.get('status_code')}: {base_resp.get('status_msg')}\n"
+            f"完整响应: {json.dumps(data, ensure_ascii=False)}"
+        )
+    if "choices" not in data:
+        raise RuntimeError(
+            f"MiniMax 响应缺少 choices 字段，完整响应:\n{json.dumps(data, ensure_ascii=False)}"
+        )
     return data["choices"][0]["message"]["content"]
 
 
