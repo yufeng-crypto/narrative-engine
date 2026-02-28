@@ -12,7 +12,7 @@ def _load_env():
     """从 .env 文件加载环境变量（如果存在）"""
     env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
     if os.path.exists(env_path):
-        with open(env_path) as f:
+        with open(env_path, encoding='utf-8') as f:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith("#") and "=" in line:
