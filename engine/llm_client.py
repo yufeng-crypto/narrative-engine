@@ -1,11 +1,14 @@
 """
-统一 LLM 调用客户端，支持 JSON 结构化输出
+统一 LLM 调用客户端 - MiniMax API
 """
 import os
 import json
-import anthropic
+import httpx
 
-_client = None
+MINIMAX_API_URL = "https://api.minimax.io/v1/text/chatcompletion_v2"
+DEFAULT_MODEL = "MiniMax-M2.5"
+
+_api_key = None
 
 
 def _load_env():
@@ -20,38 +23,46 @@ def _load_env():
                     os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
 
-def get_client() -> anthropic.Anthropic:
-    global _client
-    if _client is None:
+def _get_api_key() -> str:
+    global _api_key
+    if _api_key is None:
         _load_env()
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        base_url = os.environ.get("ANTHROPIC_BASE_URL")
-        if not api_key:
+        _api_key = os.environ.get("MINIMAX_API_KEY")
+        if not _api_key:
             raise RuntimeError(
-                "未找到 ANTHROPIC_API_KEY\n"
+                "未找到 MINIMAX_API_KEY\n"
                 "请在 narrative_engine/.env 文件中设置：\n"
-                "  ANTHROPIC_API_KEY=sk-ant-..."
+                "  MINIMAX_API_KEY=eyJ..."
             )
-        kwargs = {"api_key": api_key}
-        if base_url:
-            kwargs["base_url"] = base_url
-        _client = anthropic.Anthropic(**kwargs)
-    return _client
+    return _api_key
 
 
-def call_llm(system_prompt: str, user_prompt: str, model: str = "claude-haiku-4-5-20251001") -> str:
+def call_llm(system_prompt: str, user_prompt: str, model: str = DEFAULT_MODEL) -> str:
     """普通文本调用"""
-    client = get_client()
-    msg = client.messages.create(
-        model=model,
-        max_tokens=1024,
-        messages=[{"role": "user", "content": user_prompt}],
-        system=system_prompt,
-    )
-    return msg.content[0].text
+    api_key = _get_api_key()
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "name": "MiniMax AI", "content": system_prompt},
+            {"role": "user", "name": "user", "content": user_prompt},
+        ],
+        "max_tokens": 1024,
+    }
+    with httpx.Client(timeout=60.0) as client:
+        resp = client.post(
+            MINIMAX_API_URL,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    return data["choices"][0]["message"]["content"]
 
 
-def call_llm_json(system_prompt: str, user_prompt: str, model: str = "claude-haiku-4-5-20251001") -> dict:
+def call_llm_json(system_prompt: str, user_prompt: str, model: str = DEFAULT_MODEL) -> dict:
     """返回 JSON dict，自动解析"""
     system_prompt = system_prompt + "\n\n【重要】你的输出必须是合法的 JSON，不加任何 markdown 代码块，不加任何额外解释。"
     raw = call_llm(system_prompt, user_prompt, model)
