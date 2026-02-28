@@ -54,7 +54,7 @@ def generate(director_output: dict, state: dict, history: list) -> dict:
 
 请以 {DEFAULT_CHARACTER['name']} 的身份，按照导演指令生成本轮回复。"""
 
-    response_text = call_llm(system, user_prompt, model="claude-haiku-4-5-20251001")
+    response_text = call_llm(system, user_prompt)
 
     return {
         "_module": "performance_layer",
